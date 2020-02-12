@@ -1,8 +1,14 @@
 # selforg-hexapod
-Hexapod locomotion via a dynamical systems approach. Using ArcBotics Hexy and Servotor32.
+Hexapod locomotion via a dynamical systems approach, using 'ArcBotics Hexy' and 'Servotor32'.
+
+The original code from
 https://github.com/ArcBotics/Servotor32
+was modified by an editing and addition of the lines 425-1179 and the functions 'update_all_registers_fast' and 'sendToPC' in Servotor32.cpp.
 
 
+
+
+# MIT-license
 All hardware for Servotor32 is licensed under a Creative Commons Attribution ShareAlike 3.0 United States License.
 The full terms of this license can be read at:
 http://creativecommons.org/licenses/by-sa/3.0/
