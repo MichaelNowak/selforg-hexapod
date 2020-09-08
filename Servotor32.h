@@ -42,7 +42,7 @@ public:
   void delay_ms(long unsigned int);
   void delay_us(long unsigned int);
   
-  void changeServo(byte, short);
+//  void changeServo(byte, short);
   
   void printStatus(Stream*);
   
@@ -50,14 +50,18 @@ public:
   
   float ping();
   float multiPing(unsigned short);
-  void update_registers_fast(byte, signed short);
+
   void update_all_registers_fast();
-  
-  void sendToPC(int*, int*, int*, int*, int*, int*, int*, int*, int*, int*, int*, int*, int*, Stream*);
-  
-private:
-  void delete_from_sorted_array(byte, byte, signed short);
-  void add_to_sorted_array(byte, byte, signed short);
+
+  void sendToPC(int*, Stream*);
+  void calibrateExtrema(Stream*, boolean);
+  void printParameters(Stream*);
+  void readSensorValues(Stream*);
+  void positionAndSensor(Stream*);
+  void positionFromSensor(Stream*);
+  void stand();
+
+ private:
   static void callback();
   short tallyCount();
 
