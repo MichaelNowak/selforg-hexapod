@@ -328,8 +328,8 @@ byte tibia_leg_num[6] = {5, 9, 13, 18, 22, 26};
 // motor positions and corresponding sensor values of motion range (minimum, maximum)
 // vertical
 //byte vertical_min[6] = {211, 222, 218, 217, 223, 223}; // physically minimal vertical motor positions
-byte vertical_min[6] = {181, 192, 188, 187, 193, 193}; // physically minimal vertical motor positions
-int sensor_vert_min[6] = {258, 222, 221, 220, 206, 203}; // minimal vertical sensor values
+byte vertical_min[6] = {181, 192, 188, 187, 193, 190}; // physically minimal vertical motor positions
+int sensor_vert_min[6] = {258, 222, 221, 220, 206, 205}; // minimal vertical sensor values
 
 byte vertical_max[6] = {120, 135, 135, 130, 135, 135}; // maximal vertical motor positions
 int sensor_vert_max[6] = {446, 392, 394, 390, 383, 377}; // maximal vertical sensor values
@@ -343,7 +343,7 @@ int sensor_horiz_max[6] = {341, 421, 437, 236, 253, 332}; // maximal horizontal 
 
 // tibia (no sensor values needed)
 //byte tibia_min[6] = {60, 80, 55, 80, 80, 60};  // rectangluar tibia motor position to femur
-byte tibia_min[6] = {105, 110, 97, 115, 110, 107};  // minimum tibia motor position for stand
+byte tibia_min[6] = {105, 110, 97, 115, 110, 115};  // minimum tibia motor position for stand
 byte tibia_max[6] = {130, 135, 135, 145, 140, 140}; // maximal tibia motor position
 
 byte legsets[3] = {2, 3, 6}; // number of main phase shifts
@@ -391,13 +391,13 @@ int sensor_values[6];
 const byte inputCount = 22; // number of observables to write to serial
 int input_array[inputCount]; // array of observables
 
-// time variables
+// initialization of time variables
 unsigned long time_null = 0;
 unsigned long while_start = 0;
-int target_dt_millis = 105;
-int dt_millis = 105;
+int target_dt_millis = 110;//105;
+int dt_millis = 110;//105;
 int delay_dt = 0;
-float dt = 0.105;
+float dt = 0.11;//0.105;
 unsigned int time_total = 0;
 
 int step_count = 0;
@@ -409,14 +409,13 @@ boolean read_sensor = true; // read motor sensor values
 boolean test_print = false; // continuously prints set variable values
 boolean sensor_cutoff = false; // restrict sensor values to [0,1], cuts off values exceeding the limits
 boolean tripod_calibration = false; // calibrate the sensor values to the motor limits with three legs on the ground
-                                  // otherwise calibration in air
+// otherwise calibration in air
 
 byte locomotion = 0; // 0: default, 1: stomp, 2: stand
 char rangeshift = 0; // +- motor position correction for horizontal motor position range
 
 byte sensor_start = 5; // iteration step for closing the feedback loop; ensures stability at start
 
-float ics_tau = 0.1; // time shift in seconds for neural bias initial conditions
 float b_dot_bin; // time derivative of neural bias with binary approximation for initial conditions
 
 byte sensors = 1; // 0: vertical, 1: horizontal
@@ -424,11 +423,14 @@ byte feedback_loop = 1; // 0: open, 1: closed
 
 // gait settings
 byte gait_num = 0; // gait number; 0: tripod, 1: tetrapod, 2: wave
+boolean identity = false;
 
 // parameter arrays
 float gain_vert_arr[3] = {5., 5., 5.}; // neural gain
 float tau_x_arr[3] = {0.13, 0.13, 0.13}; // time constant of membrane potential
+//float tau_b_arr[3] = {0.13, 0.13, 0.13}; // time constant of neural bias
 float tau_b_arr[3] = {0.2, 0.2, 0.2}; // time constant of neural bias
+//float weight_arr[3] = {1.67, 2.5, 5}; // scaling factor of membrane potential feedback input
 float weight_arr[3] = {1.7, 3, 7}; // scaling factor of membrane potential feedback input
 float neuron_avg_arr[3] = {0.4, 0.27, 0.13}; // neural activation mean y_bar
 
@@ -440,6 +442,9 @@ float tau_b = tau_b_arr[gait_num];
 float tau_x = tau_x_arr[gait_num];
 float weight = weight_arr[gait_num];
 float neuron_avg = neuron_avg_arr[gait_num];
+
+//float ics_tau = 0.1; // time shift in seconds for neural bias initial conditions
+float ics_tau = weight * legpairs[gait_num] * tau_b / (1 - neuron_avg) * 1 / 2; // time shift of half neural activation
 
 void Servotor32::process(Stream *serial) { // called in Servotor32_Firmware.ino as 'hexy' object member function
   // with serial address
@@ -457,10 +462,24 @@ void Servotor32::process(Stream *serial) { // called in Servotor32_Firmware.ino 
           // initial conditions
 
           // gait matrix calculation based on given leg numeration and moving sequence
-          for (int i = 0; i < 6; i++) {
-            for (int j = 0; j < 6; j++) {
-              matrix[i][j] = 1 - 2 * (float) ((gait_seq_arr[gait_num][j] + (legsets[gait_num]
-                  - gait_seq_arr[gait_num][i])) % legsets[gait_num]) / (legsets[gait_num] - 1);
+          if (identity == true) {
+            for (int i = 0; i < 6; i++) {
+              for (int j = 0; j < 6; j++) {
+                if (i == j) {
+                  matrix[i][j] = 1 * legpairs[gait_num]; // scaled with the number of in-phase osc. to match gaits
+                }
+                else {
+                  matrix[i][j] = 0;
+                }
+              }
+            }
+          }
+          else {
+            for (int i = 0; i < 6; i++) {
+              for (int j = 0; j < 6; j++) {
+                matrix[i][j] = 1 - 2 * (float) ((gait_seq_arr[gait_num][j] + (legsets[gait_num]
+                    - gait_seq_arr[gait_num][i])) % legsets[gait_num]) / (legsets[gait_num] - 1);
+              }
             }
           }
 
@@ -477,7 +496,7 @@ void Servotor32::process(Stream *serial) { // called in Servotor32_Firmware.ino 
               b_dot_bin = -neuron_avg / tau_b; // \dot{b} where y=0
             }
             // ics bias values between 0 and legpairs[gait_num] * weight
-            bias_vert[i] = legpairs[gait_num] * weight * (matrix[i][0] + 1) / 2 - b_dot_bin * ics_tau;
+            bias_vert[i] = weight * legpairs[gait_num] * (matrix[i][0] + 1) / 2 - b_dot_bin * ics_tau;
 
             // additional ics
             bias_vert_old[i] = legpairs[gait_num] * weight * (matrix[i][0] + 1) / 2 - b_dot_bin * (ics_tau
@@ -524,8 +543,9 @@ void Servotor32::process(Stream *serial) { // called in Servotor32_Firmware.ino 
             // calibration
             if (calibrate) {
               calibrateExtrema(serial, false); // calibrating sensor values to position values for min-max normalization
+              stand();
             }
-            stand();
+
             for (int i = 0; i < 6; i++) {
               sensor_values[i] = analogRead(analogSensors_arr[i]); // storing read sensor values in array
               analog_sensor_norm_real[i] = (float) (sensor_values[i] - sensor_min[i]) / (sensor_max[i] - sensor_min[i]);
@@ -569,7 +589,7 @@ void Servotor32::process(Stream *serial) { // called in Servotor32_Firmware.ino 
 
           while_start = millis_new(); // total runtime initialization
 
-          while (inChar != '%') {  //calculation runs until '%' is received via serial port
+          while (inChar != 'K') {  //calculation runs until 'K' is received via serial port
             time_null = millis_new();  // time initialization to measure iteration time
 
             // controls
@@ -676,7 +696,8 @@ void Servotor32::process(Stream *serial) { // called in Servotor32_Firmware.ino 
               }
 
               for (int i = 0; i < 6; i++) { // min-max normalization of sensor values with distinction for cutoff
-                analog_sensor_norm_real[i] = (float) (sensor_values[i] - sensor_min[i]) / (sensor_max[i] - sensor_min[i]);
+                analog_sensor_norm_real[i] =
+                    (float) (sensor_values[i] - sensor_min[i]) / (sensor_max[i] - sensor_min[i]);
                 analog_sensor_norm[i] = analog_sensor_norm_real[i];
               }
 
@@ -720,8 +741,9 @@ void Servotor32::process(Stream *serial) { // called in Servotor32_Firmware.ino 
               // closed loop with horizontal sensor feedback
               // sensor start delays feeedback input
               for (int i = 0; i < 6; i++) {
-                bias_vert_sens_horiz[i] = bias_vert_avg[i] + direction[i] * ((1 - analog_sensor_norm[i]) * (bias_vert_min[i]
-                    - bias_vert_avg[i]) + analog_sensor_norm[i] * (bias_vert_max[i] - bias_vert_avg[i]));
+                bias_vert_sens_horiz[i] =
+                    bias_vert_avg[i] + direction[i] * ((1 - analog_sensor_norm[i]) * (bias_vert_min[i]
+                        - bias_vert_avg[i]) + analog_sensor_norm[i] * (bias_vert_max[i] - bias_vert_avg[i]));
                 neuron_vert[i] = 1 / (1 + exp(gain_vert * (bias_vert_sens_horiz[i] - membrane[i])));
               }
             } else { // default vertical neural activation calculation
@@ -1037,6 +1059,9 @@ void Servotor32::printParameters(Stream *serial) { // print the current set para
   serial->print("Y_max=");
   serial->print(neuron_horiz_max);
   serial->print(", ");
+  serial->print("identity=");
+  serial->print(identity);
+  serial->print(", ");
   serial->print("gait=");
   serial->print(gait_num);
   serial->print(", ");
@@ -1226,7 +1251,8 @@ void Servotor32::positionAndSensor(Stream *serial) { // go stepwise within motio
   }
 }
 
-void Servotor32::calibrateExtrema(Stream *serial, boolean printSensorLimits) { // store sensor values of given motor positions extrema
+void Servotor32::calibrateExtrema(Stream *serial,
+                                  boolean printSensorLimits) { // store sensor values of given motor positions extrema
   if (tripod_calibration == false) {
     if (sensors == 0) {
       for (int i = 0; i < 6; i++) {
@@ -1260,8 +1286,7 @@ void Servotor32::calibrateExtrema(Stream *serial, boolean printSensorLimits) { /
       sensor_max[i] = analogRead(analogSensors_arr[i]);
     }
     delay_ms(600);
-  }
-  else{
+  } else {
     stand();
     delay_ms(5000);
     if (sensors == 0) {

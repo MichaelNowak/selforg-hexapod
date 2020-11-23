@@ -14,7 +14,7 @@ void loop() {
    
   while(true){
     hexy.process(&Serial1); //process input from the board serial (i.e. bluetooth)
-//    hexy.process(&Serial); //process input from the USB
+    hexy.process(&Serial); //process input from the USB
   }
   
 }
