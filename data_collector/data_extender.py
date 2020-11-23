@@ -53,7 +53,7 @@ def	read_header(file_path):
 
 #calculation: deviation from the actual data due to rounding to 10^-3
 #higher accuracy not needed
-def calculate(df, gait_num, feedback_loop, sensors, weight, neuron_avg, gain_vert, tau_b, tau_x, neuron_horiz_max, sensor_start, direction, ics_tau, dt, cut):
+def calculate(df, gait_num, feedback_loop, sensors, weight, neuron_avg, gain_vert, tau_b, tau_x, neuron_horiz_max, sensor_start, direction, ics_tau, dt, cut, identity):
 	
 	legsets = [2, 3, 6]
 	legpairs = [3, 2, 1]
@@ -82,8 +82,15 @@ def calculate(df, gait_num, feedback_loop, sensors, weight, neuron_avg, gain_ver
 
 	for i in range(6):
 		for j in range(6):
-			matrix[i][j] = 1 - 2 * ((gait_seq_arr[gait_num][j] + (legsets[gait_num]
+			if identity == True:
+				if i == j:
+					matrix[i][j] = 1 * legpairs[gait_num]
+				else:
+					matrix[i][j] = 0
+			else:
+				matrix[i][j] = 1 - 2 * ((gait_seq_arr[gait_num][j] + (legsets[gait_num]
 					- gait_seq_arr[gait_num][i])) % legsets[gait_num]) / (legsets[gait_num] - 1)
+				
 		membrane[i] = df['x_' + str(i)].values[0] * 0.001
 		bias_vert[i] = df['b_v_' + str(i)].values[0] * 0.001
 		analog_sensor_norm_real[i] = df['sensor_' + str(i)].values[0] * 0.001
@@ -160,6 +167,9 @@ def calculate(df, gait_num, feedback_loop, sensors, weight, neuron_avg, gain_ver
 				bias_vert_sens_horiz[i] = bias_vert_avg[i] + direction * ((1 - analog_sensor_norm[i]) * (bias_vert_min[i] - bias_vert_avg[i]) + analog_sensor_norm[i] * (bias_vert_max[i] - bias_vert_avg[i]))
 				neuron_vert[i] = 1 / (1 + np.exp(gain_vert * (bias_vert_sens_horiz[i] - membrane[i])))
 		else:
+			if sensors == 1:
+				for i in range(6):
+					bias_vert_sens_horiz[i] = bias_vert_avg[i] + direction * ((1 - analog_sensor_norm[i]) * (bias_vert_min[i] - bias_vert_avg[i]) + analog_sensor_norm[i] * (bias_vert_max[i] - bias_vert_avg[i]))
 			for i in range(6):
 				neuron_vert[i] = 1 / (1 + np.exp(gain_vert * (bias_vert[i] - membrane[i])))
 				
@@ -222,13 +232,19 @@ def write_csv(header, df, path, filename):
 
 modify_existing = False
 if modify_existing:
-	path = ''
-	filename = ''
+	path = 'path/to/file'
+	filename = 'filename'
 	file_path = path + filename + '.csv'
 	header = read_header(file_path)
 	df = read_to_pandas(file_path)
 	df = rename_cols(df)
 	df = insert_missing(df)
-	df = calculate(df=df, gait_num=0, feedback_loop=1, sensors=1, weight=1.7, neuron_avg=0.4, gain_vert=5, tau_b=0.2, tau_x=0.13, neuron_horiz_max=0.95, sensor_start=5, direction=1, ics_tau=0.1, dt=105, cut=1)
+	#parameter settings for the gaits
+	#tripod
+#	df = calculate(df=df, gait_num=0, feedback_loop=0, sensors=1, weight=1.7, neuron_avg=0.4, gain_vert=5, tau_b=0.2, tau_x=0.13, neuron_horiz_max=0.95, sensor_start=5, direction=1, ics_tau=0.85, dt=110, cut=0, identity=0)
+	#tetrapod
+#	df = calculate(df=df, gait_num=0, feedback_loop=0, sensors=1, weight=3, neuron_avg=0.27, gain_vert=5, tau_b=0.2, tau_x=0.13, neuron_horiz_max=0.95, sensor_start=5, direction=1, ics_tau=0.85, dt=110, cut=0, identity=0)
+	#wave
+	df = calculate(df=df, gait_num=0, feedback_loop=0, sensors=1, weight=7, neuron_avg=0.13, gain_vert=5, tau_b=0.2, tau_x=0.13, neuron_horiz_max=0.95, sensor_start=5, direction=1, ics_tau=0.85, dt=110, cut=0, identity=0)
 	df = to_float(df)
 	write_csv(header, df, path, filename)

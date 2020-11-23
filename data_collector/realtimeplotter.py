@@ -43,7 +43,7 @@ class serialPlot:
 		self.previousTimer = 0
 		self.csvData = []
 		self.counter = 0
-		self.path = ''
+		self.path = 'path/to/files/'
 		self.filename = None
 		self.saveToPath = None
 		self.params_dict = {}
@@ -148,20 +148,24 @@ class serialPlot:
 		ts = time.time()
 		st = datetime.datetime.fromtimestamp(ts).strftime('%d-%m-%Y_%H'+'h-%Mm-%Ss')
 		
-		gait_arr = ['tripod', 'tetrapod', 'wave', 'identity']
+		gait_arr = ['tripod', 'tetrapod', 'wave']
 		gait_num = int(self.params_dict['gait'])
 		feedback_loop_arr = ['open', 'closed']
 		feedback_loop_num = int(self.params_dict['loop'])
 		sensors_arr = ['vertical', 'horizontal']
 		sensors_num = int(self.params_dict['sensors'])
-		ground_arr = ['air', 'floor']
+		ground_arr = ['air', 'floor', 'inclined', 'declined']
 		load = ['unloaded', 'loaded']
 		data = ['x', 'b', 'sensors']
 		data_str = data[0] + '_' + data[1] + '_' + data[2]
 
 		legenum = '#0: front left\n#1: middle left\n#2: back left\n#3: back right\n#4: middle right\n#5: front right'
 		columns = '#number,' + str(['#out' + str(i) for i in range(self.numPlots)])[1:-1].replace("'", "")
-		self.filename = str(gait_arr[gait_num]) + '_' + str(data_str) + '_' + str(feedback_loop_arr[feedback_loop_num]) + '_' + str(sensors_arr[sensors_num]) + '_' + str(ground_arr[ground_num]) + '_' + str(load[load_num]) + '_' + str(st)
+		
+		if str(self.params_dict['identity']) == '1':
+			self.filename = 'identity' + '_' + gait_arr[gait_num] + '_' + data_str + '_' + feedback_loop_arr[feedback_loop_num] + '_' + sensors_arr[sensors_num] + '_' + ground_arr[ground_num] + '_' + load[load_num] + '_' + st
+		else:
+			self.filename = str(gait_arr[gait_num]) + '_' + str(data_str) + '_' + str(feedback_loop_arr[feedback_loop_num]) + '_' + str(sensors_arr[sensors_num]) + '_' + str(ground_arr[ground_num]) + '_' + str(load[load_num]) + '_' + str(st)
 		
 		self.saveToPath = self.path + self.filename + '.csv'
 		
@@ -178,6 +182,7 @@ class serialPlot:
 		f.write('#------------------------------------------------------\n')
 		f.write('#Settings:\n')
 		f.write('#\n')
+		f.write('#Identity: ' + str(self.params_dict['identity']) + '\n')
 		f.write('#Gait: ' + str(gait_arr[gait_num]) + '\n')
 		f.write('#Feedback config: ' + str(feedback_loop_arr[feedback_loop_num]) + '\n')
 		f.write('#Sensors: ' + str(sensors_arr[sensors_num]) + '\n')
@@ -269,18 +274,22 @@ def main():
 	#portName = '/dev/cu.usbmodem14101' # MacBook Pro
 	portName = '/dev/cu.ArcBotics-DevB'	# bluetooth
 	# portName = '/dev/ttyUSB0'
-	baudRate = 9600
-	#baudRate = 115200
+	
+	if portName == '/dev/cu.ArcBotics-DevB':
+		baudRate = 115200
+	else:
+		baudRate = 9600
+		
 	maxPlotLength = 100     # number of points in x-axis of real time plot
 	dataNumBytes = 2        # number of bytes of 1 data point
 	numPlots = 22           # number of plots in 1 graph
 	
-	ground_arr = ['air', 'floor']
+	ground_arr = ['air', 'floor', 'inclined', 'declined']
 	load = ['unloaded', 'loaded']
 	
-	ground_num = 1	#0: air, 1: floor
+	ground_num = 3	#0: air, 1: floor
 	load_num = 1	#0: unloaded, 1: loaded
-	recording_time = 60
+	recording_time = 45
 	
 	s = serialPlot(portName, baudRate, maxPlotLength, dataNumBytes, numPlots)   # initializes all required variables
 	s.getParameterInfos()
@@ -296,7 +305,7 @@ def main():
 
 	show_plot = False
 	try:
-		if show_plot:
+		if show_plot:	# not optimized for display yet
 			# plotting starts below
 			pltInterval = 100    # Period at which the plot animation updates [ms]
 			xmin = 0
@@ -350,6 +359,7 @@ def main():
 		
 		s.save_file()
 		s.stopCalc()
+		s.killMotors()
 		s.stance()
 		s.killMotors()
 		s.close()
@@ -358,7 +368,9 @@ def main():
 		df = rc.read_to_pandas(s.saveToPath)
 		df = rc.rename_cols(df)
 		df = rc.insert_missing(df)
-		df = rc.calculate(df=df, weight=float(s.params_dict['g']), neuron_avg=float(s.params_dict['y_bar']), gain_vert=float(s.params_dict['a']), tau_b=float(s.params_dict['tau_b']), tau_x=float(s.params_dict['tau_x']), neuron_horiz_max=float(s.params_dict['Y_max']), gait_num=int(s.params_dict['gait']), feedback_loop=int(s.params_dict['loop']), sensors=int(s.params_dict['sensors']), sensor_start=int(s.params_dict['sensor_start']), direction=float(s.params_dict['direction']), ics_tau=float(s.params_dict['ics_tau']), dt=float(s.params_dict['dt'])*0.001, cut=bool(s.params_dict['sensor_cutoff']))
+		df = rc.calculate(df=df, weight=float(s.params_dict['g']), neuron_avg=float(s.params_dict['y_bar']), gain_vert=float(s.params_dict['a']), tau_b=float(s.params_dict['tau_b']), tau_x=float(s.params_dict['tau_x']), neuron_horiz_max=float(s.params_dict['Y_max']), gait_num=int(s.params_dict['gait']), feedback_loop=int(s.params_dict['loop']), sensors=int(s.params_dict['sensors']), sensor_start=int(s.params_dict['sensor_start']), direction=float(s.params_dict['direction']), ics_tau=float(s.params_dict['ics_tau']), dt=float(s.params_dict['dt'])*0.001, cut=bool(s.params_dict['sensor_cutoff']),
+			identity=bool(s.params_dict['identity']))
+		
 		df = rc.to_float(df)
 		rc.write_csv(header, df, s.path, s.filename)
 		print('Modified datafile saved.')
